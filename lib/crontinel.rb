@@ -74,6 +74,11 @@ module Crontinel
   class Client
     attr_reader :config
 
+    NETWORK_ERRORS = [
+      Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout,
+      SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET
+    ].freeze
+
     def initialize(api_key: nil, endpoint: nil)
       @config = Config.new
       @config.api_key = api_key if api_key
@@ -168,10 +173,7 @@ module Crontinel
       else
         raise NetworkError, "Crontinel API error: #{response.code} #{response.message}"
       end
-    rescue *[
-        Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout,
-        SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET
-      ] => e
+    rescue *NETWORK_ERRORS => e
       raise NetworkError, "Failed to connect to Crontinel: #{e.message}"
     end
   end
