@@ -5,6 +5,7 @@ AllCops:
   Exclude:
     - "vendor/**/*"
 
+# Metrics — more permissive for a client library
 Metrics/MethodLength:
   Max: 25
 
@@ -14,7 +15,23 @@ Metrics/AbcSize:
 Metrics/ClassLength:
   Max: 200
 
+# Disable stylistic cops that create noise without value
 Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  Enabled: false
+
+Style/StringLiteralsInInterpolation:
+  Enabled: false
+
+Style/ExpandPathArguments:
+  Enabled: false
+
+Bundler/OrderedGems:
+  Enabled: false
+
+Gemspec/OrderedDependencies:
   Enabled: false
 
 Gemspec/RequireMFA:
