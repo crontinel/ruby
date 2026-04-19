@@ -2,6 +2,7 @@
 
 require "net/http"
 require "json"
+require "time"
 require "crontinel/version"
 
 module Crontinel
@@ -73,7 +74,7 @@ module Crontinel
   class Client
     attr_reader :config
 
-    def initialize(api_key = nil, endpoint = nil)
+    def initialize(api_key: nil, endpoint: nil)
       @config = Config.new
       @config.api_key = api_key if api_key
       @config.endpoint = endpoint if endpoint
@@ -176,8 +177,8 @@ module Crontinel
   end
 
   class << self
-    def client(api_key = nil, endpoint = nil, &block)
-      Client.new(api_key, endpoint, &block)
+    def client(api_key: nil, endpoint: nil, &block)
+      Client.new(api_key: api_key, endpoint: endpoint, &block)
     end
   end
 end
