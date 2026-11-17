@@ -39,3 +39,7 @@ Gemspec/RequireMFA:
 
 Gemspec/DevelopmentDependencies:
   Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*"

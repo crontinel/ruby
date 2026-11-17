@@ -81,6 +81,8 @@ module Crontinel
 
     def initialize(api_key: nil, endpoint: nil)
       @config = Config.new
+      @config.api_key = ENV.fetch("CRONTINEL_API_KEY", nil)
+      @config.endpoint = ENV["CRONTINEL_API_URL"] if ENV["CRONTINEL_API_URL"]
       @config.api_key = api_key if api_key
       @config.endpoint = endpoint if endpoint
       yield @config if block_given?
@@ -92,59 +94,59 @@ module Crontinel
     # Record a scheduled task completing successfully
     def task_finished(name:, output: nil, duration_ms: nil)
       mcp_call("notify/schedule_run", {
-        command: name,
-        exit_code: 0,
-        duration_ms: duration_ms,
-        output: output,
-        ran_at: Time.now.utc.iso8601(3),
-        app: "ruby",
-      })
+                 command: name,
+                 exit_code: 0,
+                 duration_ms: duration_ms,
+                 output: output,
+                 ran_at: Time.now.utc.iso8601(3),
+                 app: "ruby"
+               })
     end
 
     # Record a scheduled task failing
     def task_failed(name:, error: nil, output: nil, duration_ms: nil)
       mcp_call("notify/schedule_run", {
-        command: name,
-        exit_code: error ? 1 : 1,
-        duration_ms: duration_ms,
-        output: output || error,
-        ran_at: Time.now.utc.iso8601(3),
-        app: "ruby",
-      })
+                 command: name,
+                 exit_code: 1,
+                 duration_ms: duration_ms,
+                 output: output || error,
+                 ran_at: Time.now.utc.iso8601(3),
+                 app: "ruby"
+               })
     end
 
     # Record a queue worker heartbeat / processed batch
-    def worker_heartbeat(name:, status: "running", jobs_processed: nil, jobs_failed: nil, memory_mb: nil)
+    def worker_heartbeat(name:, status: "running", jobs_processed: nil, jobs_failed: nil, memory_mb: nil) # rubocop:disable Lint/UnusedMethodArgument
       mcp_call("notify/queue_processed", {
         queue: name,
         processed: jobs_processed || 0,
         failed: jobs_failed || 0,
         ran_at: Time.now.utc.iso8601(3),
-        app: "ruby",
+        app: "ruby"
       }.compact)
     end
 
     # Send a custom event
     def event(key:, message:, state: "info", metadata: {})
       mcp_call("notify/event", {
-        key: key,
-        message: message,
-        state: state,
-        metadata: metadata,
-        ran_at: Time.now.utc.iso8601(3),
-        app: "ruby",
-      })
+                 key: key,
+                 message: message,
+                 state: state,
+                 metadata: metadata,
+                 ran_at: Time.now.utc.iso8601(3),
+                 app: "ruby"
+               })
     end
 
     # Send a Horizon snapshot
     def horizon_snapshot(supervisors:, failed_jobs_per_minute: 0, paused: false)
       mcp_call("notify/horizon_snapshot", {
-        supervisors: supervisors,
-        failed_jobs_per_minute: failed_jobs_per_minute,
-        paused: paused,
-        ran_at: Time.now.utc.iso8601(3),
-        app: "ruby",
-      })
+                 supervisors: supervisors,
+                 failed_jobs_per_minute: failed_jobs_per_minute,
+                 paused: paused,
+                 ran_at: Time.now.utc.iso8601(3),
+                 app: "ruby"
+               })
     end
 
     # ── Query methods (uses MCP tools/call) ───────────────────
@@ -152,19 +154,19 @@ module Crontinel
     # List all scheduled jobs
     def scheduled_jobs
       result = mcp_call("tools/call", { name: "list_scheduled_jobs", arguments: {} })
-      (result["content"] || []).flat_map { |c| JSON.parse(c["text"]) rescue [] }.map { |r| TaskRun.new(r) }
+      parse_content(result).map { |r| TaskRun.new(r) }
     end
 
     # Get status for a specific cron command
     def cron_status(command:)
       result = mcp_call("tools/call", { name: "get_cron_status", arguments: { command: command } })
-      (result["content"] || []).flat_map { |c| JSON.parse(c["text"]) rescue [] }.first
+      parse_content(result).first
     end
 
     # List recent alerts
     def recent_alerts(hours: 24)
       result = mcp_call("tools/call", { name: "list_recent_alerts", arguments: { hours: hours } })
-      (result["content"] || []).flat_map { |c| JSON.parse(c["text"]) rescue [] }
+      parse_content(result)
     end
 
     # Check if Crontinel is reachable (direct HTTP, not MCP)
@@ -176,8 +178,10 @@ module Crontinel
     end
 
     # ── Backward-compatible aliases ───────────────────────────
-    def task_started(name:, output: nil)
-      task_finished(name: name, output: output)
+    # Crontinel records a run when it ends, so there is nothing to send at the start.
+    # Kept so existing calls keep working; it used to record a finished run by mistake.
+    def task_started(name: nil, output: nil) # rubocop:disable Lint/UnusedMethodArgument
+      nil
     end
 
     def task_runs(name:, limit: 10)
@@ -190,15 +194,23 @@ module Crontinel
 
     private
 
+    def parse_content(result)
+      (result["content"] || []).flat_map do |c|
+        JSON.parse(c["text"])
+      rescue StandardError
+        []
+      end
+    end
+
     # Unified MCP JSON-RPC call against /api/mcp
-    def mcp_call(method, params = {})
+    def mcp_call(method, params = {}) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       uri = URI("#{@config.endpoint}/api/mcp")
 
       body = {
         jsonrpc: "2.0",
         id: (Time.now.to_f * 1000).to_i,
         method: method,
-        params: params,
+        params: params
       }
 
       req = Net::HTTP::Post.new(uri)
@@ -219,6 +231,7 @@ module Crontinel
         if data["error"]
           raise NetworkError, "Crontinel RPC error: #{data["error"]["code"]}: #{data["error"]["message"]}"
         end
+
         data["result"]
       else
         raise NetworkError, "Crontinel API error: #{response.code} #{response.message}"
@@ -265,7 +278,7 @@ module Crontinel
       yield config
       config
     end
-    alias_method :setup, :configure
+    alias setup configure
 
     def config
       @config ||= Configuration.new
