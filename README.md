@@ -23,11 +23,8 @@ gem install crontinel
 ```ruby
 require "crontinel"
 
-# Configure with your API key
+# Configure with your API key (or set CRONTINEL_API_KEY and call Crontinel.client)
 client = Crontinel.client(api_key: "your_api_key_here")
-
-# Record a cron job starting
-client.task_started(name: "send-daily-summary")
 
 # Do your work...
 result = send_daily_summary
@@ -42,7 +39,6 @@ client.task_finished(name: "send-daily-summary", duration_ms: 520)
 client = Crontinel.client(api_key: ENV["CRONTINEL_API_KEY"])
 
 begin
-  client.task_started(name: "process-invoices")
   process_invoices
   client.task_finished(name: "process-invoices", duration_ms: 3200)
 rescue => e
@@ -87,7 +83,7 @@ Create a new Crontinel client.
 
 ### `#task_started(name:, output: nil)`
 
-Record that a task began execution.
+Does nothing. Crontinel records a run when it ends, so call `task_finished` or `task_failed`.
 
 ### `#task_finished(name:, output: nil, duration_ms: nil)`
 

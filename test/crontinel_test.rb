@@ -23,6 +23,44 @@ describe Crontinel do
   end
 end
 
+describe Crontinel::Client do
+  def with_env(vars)
+    old = vars.keys.to_h { |k| [k, ENV.fetch(k, nil)] }
+    vars.each { |k, v| ENV[k] = v }
+    yield
+  ensure
+    old.each { |k, v| ENV[k] = v }
+  end
+
+  it "reads the api key and endpoint from the environment" do
+    with_env("CRONTINEL_API_KEY" => "env_key", "CRONTINEL_API_URL" => "https://example.test") do
+      client = Crontinel.client
+      assert_equal "env_key", client.config.api_key
+      assert_equal "https://example.test", client.config.endpoint
+    end
+  end
+
+  it "lets explicit arguments win over the environment" do
+    with_env("CRONTINEL_API_KEY" => "env_key", "CRONTINEL_API_URL" => "https://example.test") do
+      client = Crontinel.client(api_key: "arg_key", endpoint: "https://arg.test")
+      assert_equal "arg_key", client.config.api_key
+      assert_equal "https://arg.test", client.config.endpoint
+    end
+  end
+
+  it "still requires an api key" do
+    with_env("CRONTINEL_API_KEY" => nil) do
+      assert_raises(Crontinel::ConfigurationError) { Crontinel.client }
+    end
+  end
+
+  it "does not record a run on task_started" do
+    client = Crontinel.client(api_key: "k")
+    client.define_singleton_method(:mcp_call) { |*| raise "task_started must not send anything" }
+    assert_nil client.task_started(name: "job")
+  end
+end
+
 describe Crontinel::Config do
   describe "#validate!" do
     it "raises when api_key is nil" do
